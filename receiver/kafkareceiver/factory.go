@@ -5,6 +5,7 @@ package kafkareceiver // import "github.com/open-telemetry/opentelemetry-collect
 
 import (
 	"context"
+	"time"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
@@ -59,6 +60,8 @@ func createDefaultConfig() component.Config {
 		HeaderExtraction: HeaderExtraction{
 			ExtractHeaders: false,
 		},
+		// Default to zero to keep prior behavior; configurable by users.
+		PeriodicCommitInterval: 0 * time.Second,
 	}
 }
 

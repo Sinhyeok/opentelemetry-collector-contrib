@@ -101,6 +101,8 @@ The following settings can be optionally configured:
 - `autocommit`
   - `enable`: (default = true) Whether or not to auto-commit updated offsets back to the broker
   - `interval`: (default = 1s) How frequently to commit updated offsets. Ineffective unless auto-commit is enabled
+ - `periodic_commit_interval` (default = 0s): When `autocommit.enable` is false, how often to commit offsets during consumption. Applies only to the Sarama implementation.
+   - If set to `0s`, periodic commits are disabled and the legacy behavior is preserved: offsets are committed per-message during consumption, plus a final commit at session end or on rebalance.
 - `message_marking`:
   - `after`: (default = false) If true, the messages are marked after the pipeline execution
   - `on_error`: (default = false) If false, only the successfully processed messages are marked

@@ -82,13 +82,14 @@ func (c *saramaConsumer) Start(_ context.Context, host component.Host) error {
 	}
 
 	handler := &consumerGroupHandler{
-		host:              host,
-		logger:            c.settings.Logger,
-		obsrecv:           obsrecv,
-		autocommitEnabled: c.config.AutoCommit.Enable,
-		messageMarking:    c.config.MessageMarking,
-		telemetryBuilder:  c.telemetryBuilder,
-		backOff:           newExponentialBackOff(c.config.ErrorBackOff),
+		host:                   host,
+		logger:                 c.settings.Logger,
+		obsrecv:                obsrecv,
+		autocommitEnabled:      c.config.AutoCommit.Enable,
+		messageMarking:         c.config.MessageMarking,
+		telemetryBuilder:       c.telemetryBuilder,
+		backOff:                newExponentialBackOff(c.config.ErrorBackOff),
+		periodicCommitInterval: c.config.PeriodicCommitInterval,
 	}
 	consumeMessage, err := c.newConsumeFn(host, obsrecv, c.telemetryBuilder)
 	if err != nil {
@@ -201,6 +202,10 @@ type consumerGroupHandler struct {
 	messageMarking    MessageMarking
 	backOff           *backoff.ExponentialBackOff
 	backOffMutex      sync.Mutex
+
+	// periodicCommitInterval defines how often to commit offsets when
+	// autocommit is disabled.
+	periodicCommitInterval time.Duration
 }
 
 func (c *consumerGroupHandler) Setup(session sarama.ConsumerGroupSession) error {
@@ -225,6 +230,22 @@ func (c *consumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession,
 	)
 	if !c.autocommitEnabled {
 		defer session.Commit()
+		// Periodic commit loop
+		if c.periodicCommitInterval > 0 {
+			ticker := time.NewTicker(c.periodicCommitInterval)
+			defer ticker.Stop()
+			go func() {
+				for {
+					select {
+					case <-session.Context().Done():
+						return
+					case <-ticker.C:
+						// Best-effort periodic commit
+						session.Commit()
+					}
+				}
+			}()
+		}
 	}
 	for {
 		select {
@@ -333,9 +354,11 @@ func (c *consumerGroupHandler) handleMessage(
 	if c.messageMarking.After {
 		session.MarkMessage(message, "")
 	}
-	if !c.autocommitEnabled {
-		session.Commit()
-	}
+    // When using Sarama with autocommit disabled and periodic commits disabled (interval=0),
+    // preserve legacy behavior by committing after each processed message.
+    if !c.autocommitEnabled && c.periodicCommitInterval == 0 {
+        session.Commit()
+    }
 	return nil
 }
 
