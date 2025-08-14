@@ -4,6 +4,8 @@
 package kafkareceiver // import "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver"
 
 import (
+	"time"
+
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config/configretry"
 	"go.opentelemetry.io/collector/confmap"
@@ -57,6 +59,11 @@ type Config struct {
 
 	// Telemetry controls optional telemetry configuration.
 	Telemetry TelemetryConfig `mapstructure:"telemetry"`
+
+	// PeriodicCommitInterval controls how often offsets are committed when
+	// autocommit is disabled. If zero, periodic commits are disabled and commits
+	// happen only at session end or rebalances. Applies only to the Sarama implementation.
+	PeriodicCommitInterval time.Duration `mapstructure:"periodic_commit_interval"`
 }
 
 func (c *Config) Unmarshal(conf *confmap.Conf) error {
